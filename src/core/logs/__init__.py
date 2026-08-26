@@ -1,0 +1,1 @@
+"""Shared logging machinery for all ccc commands, kept stdlib-only: log-dir layout (:mod:`.paths`), root-handler setup (:mod:`.setup`), progress-bar de-spam (:mod:`.despam`), and reading logs back (:mod:`.reading`)."""

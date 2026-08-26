@@ -1,0 +1,88 @@
+[project]
+name = "ccc"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    # ── cross-platform ──
+    "pandas",
+    "tqdm",
+    "rich",
+    "pyyaml",
+    "prompt-toolkit", # Tab-completion for path prompts in the ccc wizards
+    "psutil",
+    "filelock",
+    "opencv-python",
+    "matplotlib",
+    "scikit-learn",
+    "scipy",
+    "jupyterlab",
+    "wandb",
+    "platformdirs",
+    "numpy<2.0",
+    "napari[pyqt5]==0.6.2", # napari GUI tools (annotation-tool_v2, annotation-tool) pinned to what annotation-tool (v1) was built against
+    "dask",
+    "tensorflow[and-cuda]~=2.16.0; sys_platform == 'linux'",
+    "keras-hub~=0.24.0; sys_platform == 'linux'",
+    "torch", # for hbcsp
+    "torchvision",
+    "honeybee-comb-segmentor",
+    "comb-limitor",
+    "cell-finder",
+    "background-generator ; sys_platform == 'linux'",
+]
+
+[project.scripts]
+# Project commands are grouped under `ccc`; the honeybee_cell_segmentation_pipeline tools under `hbcsp` (e.g. `uv run ccc training`, `uv run hbcsp cell-finder`).
+ccc   = "src.cli.ccc:main"
+hbcsp = "src.cli.hbcsp:main"
+# napari tools are their own commands, not `ccc` subcommands. v1 is upstream's, run out of the external checkout (`hbcsp annotation-tool` reaches this script too)
+annotation-tool_v2 = "src.napari_tools.annotation_tool_v2.__main__:main"
+annotation-tool = "src.cli.annotation_tool_shim:main" # not a dependency for ccc
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+# Only our own tests. external/ holds other projects' checkouts, which ship their own test suites — and their src/ layout would shadow this repo's `src` package on sys.path once pytest recursed into them.
+norecursedirs = ["external", ".venv", "output", "data", "temp", "wandb"]
+
+[tool.hatch.build.targets.wheel]
+# Repo uses `src` as the top-level import package (imports are `from src...`).
+packages = ["src"]
+
+[tool.uv]
+environments = [
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'darwin'",
+]
+
+# torch is CPU-only on linux: TF[and-cuda] owns GPU CUDA stack, and a cu121 torch would ship conflicting nvidia-* wheels
+# honeybee tools run torch on CPU (matching their map_location="cpu" loading)
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cpu", marker = "sys_platform == 'linux'" },
+]
+
+honeybee-comb-segmentor = { path = "external/honeybee_cell_segmentation_pipeline/packages/honeybee_segmentor", editable = true }
+comb-limitor = { path = "external/honeybee_cell_segmentation_pipeline/packages/comb_limitor", editable = true }
+cell-finder = { path = "external/honeybee_cell_segmentation_pipeline/tools/cell_finder", editable = true }
+background-generator = { git = "https://github.com/BioroboticsLab/honeybee_cell_segmentation_pipeline", subdirectory = "tools/background_generator", rev = "d5d73bf32a073d89e6cfe531b9c066412a2bc947" }
+
+[dependency-groups]
+dev = [
+    "black>=26.3.1",
+    "pytest>=9.1.1",
+]
+
+# for type checkers:
+[tool.pyright]
+extraPaths = ["external/honeybee_cell_segmentation_pipeline/tools/annotation_tool/src"]

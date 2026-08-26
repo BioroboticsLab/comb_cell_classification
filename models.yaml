@@ -1,0 +1,292 @@
+# Registry of backbones supported by ModelBuilder.
+#
+# Each entry:
+#   model:                 Class name on tf.keras.applications, OR
+#   keras_hub_preset:      KerasHub preset handle (see DINOv3 section at the
+#                          bottom) — exactly one of the two keys per entry.
+#   default_input_shape:   [H, W, C] expected by the backbone.
+#   recommended_batch_size: Safe per-replica batch on an 11 GB GTX 1080 Ti
+#                          under mixed_float16. Smaller for deeper/larger
+#                          backbones whose activation tape dominates memory,
+#                          and for higher input resolutions (memory grows
+#                          ~quadratically with H*W). Tune up if you have more VRAM.
+#   preprocess:            Input scaling the backbone's pretrained weights
+#                          expect. Mandatory — ModelFactory._apply_preprocess
+#                          builds the matching layer, and a missing key is a
+#                          hard error rather than a silent wrong default.
+#
+# data pipeline hands model float32 pixels in [0, 1] (src/training/dataset/dataset.py, uint8 / 255.0). `preprocess` says how ModelFactory maps that onward, per backbone:
+#   tf      -> 2*x - 1, i.e. [-1, 1].
+#              Keras preprocess_input mode "tf".
+#   torch   -> per-channel ImageNet standardization on [0, 1]:
+#              (x - [0.485, 0.456, 0.406]) / [0.229, 0.224, 0.225].
+#              Keras preprocess_input mode "torch".
+#   raw255  -> 255*x and nothing else: these backbones ship their own
+#              Rescaling/Normalization inside the graph
+#              (include_preprocessing=True) and want raw [0, 255]. Their
+#              keras.applications.*.preprocess_input is a documented no-op,
+#              so feeding them [-1, 1] normalizes twice.
+#
+# Sources for the per-family values (all say "each Keras Application expects specific kind of input preprocessing"):
+#   MobileNet / V2 / V3    https://keras.io/api/applications/mobilenet/
+#   ResNetV2               https://keras.io/api/applications/resnet/
+#   Xception               https://keras.io/api/applications/xception/
+#   InceptionV3            https://keras.io/api/applications/inceptionv3/
+#   InceptionResNetV2      https://keras.io/api/applications/inceptionresnetv2/
+#   DenseNet               https://keras.io/api/applications/densenet/
+#   NASNet                 https://keras.io/api/applications/nasnet/
+#   EfficientNet           https://keras.io/api/applications/efficientnet/
+#   EfficientNetV2         https://keras.io/api/applications/efficientnet_v2/
+#   ConvNeXt               https://keras.io/api/applications/convnext/
+#   DINOv3                 https://github.com/facebookresearch/dinov3
+#                          (dinov3/data/transforms.py: IMAGENET_DEFAULT_MEAN/STD)
+
+# --- MobileNet family (lightweight, large batches fit) ---
+# V1/V2 take [-1, 1]. V3 does NOT: since the Rescaling moved into the model,
+# mobilenet_v3.preprocess_input is a pass-through and the model wants [0, 255].
+MobileNet:
+  model: MobileNet
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 128
+  preprocess: tf
+
+MobileNetV2:
+  model: MobileNetV2
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 128
+  preprocess: tf
+
+MobileNetV3Small:
+  model: MobileNetV3Small
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 256
+  preprocess: raw255
+
+MobileNetV3Large:
+  model: MobileNetV3Large
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 96
+  preprocess: raw255
+
+# --- ResNetV2 ---
+ResNet50V2:
+  model: ResNet50V2
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 64
+  preprocess: tf
+
+ResNet101V2:
+  model: ResNet101V2
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 48
+  preprocess: tf
+
+ResNet152V2:
+  model: ResNet152V2
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 32
+  preprocess: tf
+
+# --- Inception / Xception (299 input) ---
+Xception:
+  model: Xception
+  default_input_shape: [299, 299, 3]
+  recommended_batch_size: 32
+  preprocess: tf
+
+InceptionV3:
+  model: InceptionV3
+  default_input_shape: [299, 299, 3]
+  recommended_batch_size: 48
+  preprocess: tf
+
+InceptionResNetV2:
+  model: InceptionResNetV2
+  default_input_shape: [299, 299, 3]
+  recommended_batch_size: 24
+  preprocess: tf
+
+# --- DenseNet (dense concats inflate the activation tape) ---
+# Torch-style: [0, 1] followed by per-channel ImageNet mean/std
+DenseNet121:
+  model: DenseNet121
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 64
+  preprocess: torch
+
+DenseNet169:
+  model: DenseNet169
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 48
+  preprocess: torch
+
+DenseNet201:
+  model: DenseNet201
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 32
+  preprocess: torch
+
+# --- NASNet ---
+NASNetMobile:
+  model: NASNetMobile
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 64
+  preprocess: tf
+
+NASNetLarge:
+  model: NASNetLarge
+  default_input_shape: [331, 331, 3]
+  recommended_batch_size: 8
+  preprocess: tf
+
+# --- EfficientNet (batch shrinks fast as input resolution climbs) ---
+# Rescaling + Normalization live inside the model; preprocess_input is a no-op.
+EfficientNetB0:
+  model: EfficientNetB0
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 64
+  preprocess: raw255
+
+EfficientNetB1:
+  model: EfficientNetB1
+  default_input_shape: [240, 240, 3]
+  recommended_batch_size: 48
+  preprocess: raw255
+
+EfficientNetB2:
+  model: EfficientNetB2
+  default_input_shape: [260, 260, 3]
+  recommended_batch_size: 40
+  preprocess: raw255
+
+EfficientNetB3:
+  model: EfficientNetB3
+  default_input_shape: [300, 300, 3]
+  recommended_batch_size: 24
+  preprocess: raw255
+
+EfficientNetB4:
+  model: EfficientNetB4
+  default_input_shape: [380, 380, 3]
+  recommended_batch_size: 12
+  preprocess: raw255
+
+EfficientNetB5:
+  model: EfficientNetB5
+  default_input_shape: [456, 456, 3]
+  recommended_batch_size: 6
+  preprocess: raw255
+
+EfficientNetB6:
+  model: EfficientNetB6
+  default_input_shape: [528, 528, 3]
+  recommended_batch_size: 4
+  preprocess: raw255
+
+EfficientNetB7:
+  model: EfficientNetB7
+  default_input_shape: [600, 600, 3]
+  recommended_batch_size: 2
+  preprocess: raw255
+
+# --- EfficientNetV2 ---
+EfficientNetV2B0:
+  model: EfficientNetV2B0
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 64
+  preprocess: raw255
+
+EfficientNetV2B1:
+  model: EfficientNetV2B1
+  default_input_shape: [240, 240, 3]
+  recommended_batch_size: 48
+  preprocess: raw255
+
+EfficientNetV2B2:
+  model: EfficientNetV2B2
+  default_input_shape: [260, 260, 3]
+  recommended_batch_size: 40
+  preprocess: raw255
+
+EfficientNetV2B3:
+  model: EfficientNetV2B3
+  default_input_shape: [300, 300, 3]
+  recommended_batch_size: 24
+  preprocess: raw255
+
+EfficientNetV2S:
+  model: EfficientNetV2S
+  default_input_shape: [300, 300, 3]
+  recommended_batch_size: 24
+  preprocess: raw255
+
+EfficientNetV2M:
+  model: EfficientNetV2M
+  default_input_shape: [384, 384, 3]
+  recommended_batch_size: 12
+  preprocess: raw255
+
+EfficientNetV2L:
+  model: EfficientNetV2L
+  default_input_shape: [480, 480, 3]
+  recommended_batch_size: 2
+  preprocess: raw255
+
+# --- ConvNeXt (all 224 input; batch shrinks with width/depth) ---
+# The PreStem Normalization carries ImageNet mean/std scaled by 255, so these want [0, 255] like EfficientNet.
+ConvNeXtTiny:
+  model: ConvNeXtTiny
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 48
+  preprocess: raw255
+
+ConvNeXtSmall:
+  model: ConvNeXtSmall
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 32
+  preprocess: raw255
+
+ConvNeXtBase:
+  model: ConvNeXtBase
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 24
+  preprocess: raw255
+
+ConvNeXtLarge:
+  model: ConvNeXtLarge
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 16
+  preprocess: raw255
+
+ConvNeXtXLarge:
+  model: ConvNeXtXLarge
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 8
+  preprocess: raw255
+
+# --- DINOv3 (self-supervised ViT backbones via keras_hub, not tf.keras.applications) ---
+# `keras_hub_preset` (instead of `model`) selects the KerasHub preset; weightsn download from Kaggle (keras/dinov3) into ~/.cache/kagglehub on first use
+# all ViT/16 variants take any input size that is a multiple of 16; 224 matches pretraining resolution
+DinoV3:  # (alias for ViT-S variant)
+  keras_hub_preset: dinov3_vit_small_lvd1689m
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 16
+  preprocess: torch
+
+DinoV3SmallPlus:
+  keras_hub_preset: dinov3_vit_small_plus_lvd1689m
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 48
+  preprocess: torch
+
+DinoV3Base: # (alias for ViT-B variant)
+  keras_hub_preset: dinov3_vit_base_lvd1689m
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 8
+  preprocess: torch
+
+DinoV3Large: # (alias for ViT-L/1689 variant)
+  keras_hub_preset: dinov3_vit_large_lvd1689m
+  default_input_shape: [224, 224, 3]
+  recommended_batch_size: 6
+  preprocess: torch

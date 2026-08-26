@@ -1,0 +1,1 @@
+"""Inference package: run a trained model over images and their annotation JSONs."""

@@ -1,0 +1,90 @@
+# Reference config for `ccc training --config configs/<file>.yaml`.
+#
+# Two top-level keys, both optional:
+#   base:   dotted BeeCombConfig path -> single value (applies to every run)
+#   sweep:  dotted BeeCombConfig path -> list of values (cartesian product = one run per combination)
+#
+# Every path below is listed with its code default (src/core/config/config.py).
+# All commented out: as-is this file runs a single run with pure defaults.
+# Copy it, uncomment what you want to change — the rest keeps following the code.
+
+base:
+  # --- wandb -------------------------------------------------------------
+  # wandb.project: ccc_models
+  # wandb.entity: joev98-freie-universit-t-berlin
+  # wandb.tags: []
+
+  # --- paths (relative to project root) ----------------------------------
+  # paths.output_path: output
+  # paths.raw_data_path: data/annotated
+  # paths.debug_data_path: data/annotated_DEBUG
+  # paths.raw_annotations_path: data/annotated
+  # paths.produced_dataset_save_path: output/dataset
+  # paths.model_save_path: models/
+  # paths.models_yaml_path: models.yaml
+  # paths.tensorboard_logs: data/logs
+  # paths.evaluation_results_path: evaluation_results
+
+  # --- import ------------------------------------------------------------
+  # import_config.image_suffixes: ".jpeg, .png"
+  # import_config.annotation_suffix: .json
+  # import_config.sort_paths: true
+
+  # --- dataset -----------------------------------------------------------
+  # dataset.name: bee_comb_dataset
+  # dataset.validation_amount: 0.1
+  # dataset.evaluation_amount: 0.1
+  # dataset.seed: 1
+  # dataset.apply_clahe: true
+  # dataset.cell_outer_layer: 0           # 0,1 mostly useable
+  # dataset.roi_size_tuple: [224, 224]
+  # dataset.num_channels: 1
+  # dataset.batch_size: 32
+  # dataset.auto_batch_size: true          # true => batch_size comes from models.yaml
+  # dataset.fixed_radius: 0                # > 0 overrides the annotation radius
+  # dataset.remap_to_other: true
+  # dataset.remap_class_name: other
+  # dataset.remap_classes_set: [open_honey, pollen, unclear_cell_class, other_cell]
+
+  # --- training ----------------------------------------------------------
+  # training.model: MobileNetV3Small       # any key of models.yaml
+  # training.epochs: 50
+  # training.epoch_early_stop: true
+  # training.epoch_early_stop_patience: 5
+  # training.learning_rate: 0.001
+  # training.optimizer_epsilon: 1.0e-4
+  # training.use_adaptive_lr: true
+  # training.adaptive_lr_factor: 0.5
+  # training.adaptive_lr_patience: 3
+  # training.adaptive_min_lr_rate: 1.0e-7
+  # training.freeze_backbone: true
+  # training.unfreeze_after_epochs: 3      # 0 = trainable from epoch 1; -1 = frozen whole run
+  # training.finetune_learning_rate: 5.0e-5
+  # training.gray_to_rgb: replicate        # replicate | conv1x1
+  # training.augmentation: []              # subset of [rotate_60, flip, zoom, wiggle_around_center]
+  # training.gradient_accumulation_steps: 1
+  # training.clipnorm: 5.0                 # null disables gradient clipping
+  # training.batchnorm_momentum: 0.9       # null keeps each backbone's default
+  # training.mixed_precision: false
+  # training.use_class_weight: false
+  # training.oversample_minority_classes: true
+  # training.skip_imbalanced: true
+  # training.skip_combined_cw_os: true
+
+  # --- augmentation params (used by training.augmentation) ---------------
+  # augmentation.flip_mode: horizontal_and_vertical
+  # augmentation.rotate_step_degrees: 60
+  # augmentation.rotate_num_steps: 6
+  # augmentation.zoom_factor: [-0.1, 0.0]  # negative = zoom in
+  # augmentation.wiggle_factor: 0.1
+
+  # --- model compile -----------------------------------------------------
+  # model_compile.optimizer: adam
+  # model_compile.loss: sparse_categorical_crossentropy
+  # model_compile.metrics: [accuracy]
+
+sweep:
+  # Same paths as above, but each value is a list — one run per combination.
+  # training.model: [InceptionResNetV2, DinoV3]
+  # training.learning_rate: [0.001, 0.0005]
+  # training.augmentation: [[], [flip], [rotate_60, flip, zoom, wiggle_around_center]]
