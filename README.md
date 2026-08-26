@@ -22,7 +22,7 @@ Commands are grouped under the entry points — `ccc` for this project's command
 | `uv run ccc training [--options]` | Launch/manage a training run in the background, in its own tmux session. |
 | `uv run ccc classify --images-dir <dir>` | Load a trained `.keras` model and write predicted labels into each image's `<stem>.json` in place. Picks the model interactively (see below) unless `--model-dir`/`--model-id` is given. `--images-dir` accepts a glob (`.../cam-*`); `--reset` blanks all labels back to `unlabeled`. |
 | `uv run ccc postprocess <subcommand>` | Correction of prediction JSONs. Subcommands: `correct-spatial`, `correct-temporal`, `list-rules`; `--revert PATH` restores from `bkp/`. |
-| `uv run annotation-tool_v2 <folder>` | napari tool for annotating a time-ordered image sequence. Its own command, not a `ccc` subcommand. |
+| `annotation-tool_v2 <folder>` | napari tool for annotating a time-ordered image sequence. |
 
 Run `uv run ccc <command> --help` for a command's full flag list.
 
