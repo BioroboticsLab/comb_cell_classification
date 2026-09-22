@@ -210,6 +210,10 @@ def main(argv: Optional[list[str]] = None) -> None:
     if args.images_dir is None:
         parser.error("-i/--images-dir is required to start a run (or use log/--kill/--restart).")
 
+    if args.evaluate:
+        # The detached child never received this flag: it ran plain inference and overwrote the ground-truth labels in place.
+        parser.error("--evaluate is not implemented yet; it would overwrite the ground-truth labels. Score predictions against a separate copy of the annotations instead.")
+
     if args.reset:
         from src.core.logs.paths import run_log_file
         from src.core.logs.setup import setup_run_logging

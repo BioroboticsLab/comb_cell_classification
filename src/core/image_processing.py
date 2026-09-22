@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
 import cv2
 
 from src.core.annotations import Annotation
+
+if TYPE_CHECKING:
+    from src.core.config.config import BeeCombConfig
 
 logger = logging.getLogger(__name__)
 
@@ -68,3 +72,15 @@ def preprocess_image(img: npt.NDArray[np.uint8],
 
     return cropped_img
 
+
+def crop_cell(img: npt.NDArray[np.uint8], ann: Annotation, cfg: BeeCombConfig) -> npt.NDArray[np.uint8]:
+    """Cut one cell's crop at native resolution with CLAHE, exactly as the training dataset producer stores it; training and inference both call this, then resize to the model input (``resize_to_input``)."""
+    return preprocess_image(
+        img,
+        ann,
+        outer_layer=cfg.dataset.cell_outer_layer,
+        border=12,
+        radius_extra=20,
+        enable_clahe=cfg.dataset.apply_clahe,
+        fixed_radius=cfg.dataset.fixed_radius,
+    )

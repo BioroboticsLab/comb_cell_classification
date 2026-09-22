@@ -15,7 +15,8 @@ from tqdm import tqdm
 
 from src.core.annotations import Annotation, AnnotationDoc
 from src.core.config.config import BeeCombConfig
-from src.core.image_processing import preprocess_image
+from src.core.image_processing import crop_cell
+from src.training.dataset.utils import resize_to_input
 from src.core.annotations.discover import (
     is_fully_labeled,
     pair_images_with_annotations,
@@ -129,34 +130,34 @@ def sync_cfg_to_model(cfg: BeeCombConfig, model_dir: Path, h: int, w: int, c: in
                 "config default %s.",
                 model_dir.name, sorted(cfg.dataset.remap_classes_set),
             )
+    # Absent in model_info.json written before label_merge existed, which means no merge.
+    cfg.dataset.label_merge = dict(hyperparameters.get("label_merge") or {})
 
     logger.info(
         "Crop geometry from model: roi=%dx%d, channels=%d, col%d. Label remap "
-        "from model: remap_to_other=%s (%s -> '%s').",
-        h, w, c, cfg.dataset.cell_outer_layer, cfg.dataset.remap_to_other,
+        "from model: label_merge=%s, remap_to_other=%s (%s -> '%s').",
+        h, w, c, cfg.dataset.cell_outer_layer, cfg.dataset.label_merge, cfg.dataset.remap_to_other,
         sorted(cfg.dataset.remap_classes_set), cfg.dataset.remap_class_name,
     )
 
 
 def build_crops(img: np.ndarray, annotations: list[Annotation], cfg: BeeCombConfig, h: int, w: int, c: int) -> np.ndarray:
-    """Preprocess every annotation's ROI in *img* into a ``(N, h, w, c)`` uint8 batch."""
-    # Crop pipeline (preprocess_image + these args) is intentionally identical to training's, so the model sees the exact same inputs it was trained on.
-    crops = np.empty((len(annotations), h, w, c), dtype=np.uint8)
+    """Preprocess every annotation's ROI in *img* into a ``(N, h, w, c)`` uint8 batch, byte-identical to the crops the model was trained on."""
+    # Same two steps as training: crop_cell (native-resolution crop + CLAHE, as the dataset producer stores it), then resize_to_input (as the TFRecord parse_fn does).
+    native: list[np.ndarray] = []
+    by_shape: dict[tuple[int, ...], list[int]] = {}
     for i, ann in enumerate(annotations):
-        crop = preprocess_image(
-            img,
-            ann,
-            roi_size=cfg.dataset.roi_size_tuple[0],
-            outer_layer=cfg.dataset.cell_outer_layer,
-            border=12,
-            radius_extra=20,
-            enable_clahe=cfg.dataset.apply_clahe,
-            resize_to_roi=True,
-            fixed_radius=cfg.dataset.fixed_radius,
-        )
+        crop = crop_cell(img, ann, cfg)
         if crop.ndim == 2:
             crop = crop[..., np.newaxis]
-        crops[i] = crop
+        native.append(crop)
+        by_shape.setdefault(crop.shape, []).append(i)
+
+    crops = np.empty((len(annotations), h, w, c), dtype=np.uint8)
+    # Resize crops of equal native size (one group per cell radius) as one batch; on the CPU like the tf.data pipeline, so float rounding matches too.
+    with tf.device("/CPU:0"):
+        for indices in by_shape.values():
+            crops[indices] = resize_to_input(np.stack([native[i] for i in indices]), h, w).numpy()
     return crops
 
 def predict_labels(model: tf.keras.Model, crops: np.ndarray, class_names: list[str], batch_size: int) -> list[str]:

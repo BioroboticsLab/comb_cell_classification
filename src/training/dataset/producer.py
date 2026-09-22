@@ -41,6 +41,9 @@ class BeeCombDatasetProducer:
             f"clahe-{self.cfg.dataset.apply_clahe}",
             f"fixed-r{self.cfg.dataset.fixed_radius}" if self.cfg.dataset.fixed_radius > 0 else "fixed-rNone",
         ]
+        # label_merge is baked into the stored labels, so it must name its own cache (and leave the name of unmerged datasets unchanged).
+        if self.cfg.dataset.label_merge:
+            name_parts.append("merge-" + "+".join(f"{src}-to-{dst}" for src, dst in sorted(self.cfg.dataset.label_merge.items())))
         return "_".join(name_parts).rstrip()
 
     def _create_image_annotation_pairs(self) -> list[tuple[Path, AnnotationDoc]]:

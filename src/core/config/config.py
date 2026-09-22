@@ -69,6 +69,16 @@ class DatasetConfig:
         default_factory=lambda: {"open_honey", "pollen", "unclear_cell_class", "other_cell"}
     )
 
+    # Explicit label renames, e.g. {"open_honey": "empty_cell"}. Applied when the dataset crops are produced, before the remap_to_other collapse, so a renamed label never reaches remap_classes_set.
+    label_merge: dict = field(default_factory=dict)
+
+    def target_label(self, label: str) -> str:
+        """The class a raw annotation label is trained and evaluated as: label_merge first, then the remap_to_other collapse."""
+        label = self.label_merge.get(label, label)
+        if self.remap_to_other and label in self.remap_classes_set:
+            return self.remap_class_name
+        return label
+
 
 @dataclass
 class AugmentationConfig:
@@ -208,6 +218,7 @@ class BeeCombConfig:
             # restores these so evaluation remaps ground truth exactly as trained.
             "remap_class_name": self.dataset.remap_class_name,
             "remap_classes_set": sorted(self.dataset.remap_classes_set),
+            "label_merge": dict(self.dataset.label_merge),
             "augmentation": self.training.augmentation,
             "epoch_early_stop": self.training.epoch_early_stop,
             "freeze_backbone": self.training.freeze_backbone,

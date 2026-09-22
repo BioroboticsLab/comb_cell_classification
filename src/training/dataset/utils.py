@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import Optional
+from typing import Optional, Union
 import multiprocessing
 import os
 import threading
@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 from src.core.config.config import BeeCombConfig
 from src.core.annotations import AnnotationDoc
-from src.core.image_processing import preprocess_image
+from src.core.image_processing import crop_cell
 from pathlib import Path
 from multiprocessing.sharedctypes import Synchronized
 
@@ -31,16 +31,9 @@ def _dataset_generation_worker(image_ann_pair: tuple[Path, AnnotationDoc], cfg: 
     img = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
     preprocessed_samples = []
     for ann in anns.annotations:
-        preprocessed_img = preprocess_image(
-            img,
-            ann,
-            outer_layer=cfg.dataset.cell_outer_layer,
-            border=12,
-            radius_extra=20,
-            enable_clahe=cfg.dataset.apply_clahe,
-            fixed_radius=cfg.dataset.fixed_radius
-        )
-        preprocessed_samples.append((preprocessed_img, ann.label))
+        preprocessed_img = crop_cell(img, ann, cfg)
+        # label_merge renames at crop time, so merged cells land in their target class's shards and get split like any other cell of that class.
+        preprocessed_samples.append((preprocessed_img, cfg.dataset.label_merge.get(ann.label, ann.label)))
 
         if _shared_counter is not None:
             with _shared_counter.get_lock():
@@ -120,8 +113,13 @@ def make_parse_fn(image_size: tuple[int, int]) -> Callable[[tf.Tensor], tuple[tf
         stored_c = tf.cast(parsed["image/channels"], tf.int32)
         image = tf.io.decode_raw(parsed["image/encoded"], tf.uint8)
         image = tf.reshape(image, [stored_h, stored_w, stored_c])
-        image = tf.cast(tf.image.resize(image, [h, w]), tf.uint8)
+        image = resize_to_input(image, h, w)
         label = tf.cast(parsed["image/label_index"], tf.int32)
         return image, label
 
     return parse_fn
+
+
+def resize_to_input(image: Union[tf.Tensor, np.ndarray], h: int, w: int) -> tf.Tensor:
+    """Resize a uint8 crop, or a batch of equally sized crops, to the model input as training does: bilinear ``tf.image.resize``, then a truncating cast back to uint8."""
+    return tf.cast(tf.image.resize(image, [h, w]), tf.uint8)
