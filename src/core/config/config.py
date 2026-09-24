@@ -72,6 +72,10 @@ class DatasetConfig:
     # Explicit label renames, e.g. {"open_honey": "empty_cell"}. Applied when the dataset crops are produced, before the remap_to_other collapse, so a renamed label never reaches remap_classes_set.
     label_merge: dict = field(default_factory=dict)
 
+    # Write each class's samples to its shards in a seeded random order, which makes split() split randomly instead of
+    # by image order. Leave False to reproduce older runs; set True whenever the dataset mixes sources or cameras.
+    shuffle_before_shard: bool = False
+
     def target_label(self, label: str) -> str:
         """The class a raw annotation label is trained and evaluated as: label_merge first, then the remap_to_other collapse."""
         label = self.label_merge.get(label, label)
@@ -219,6 +223,7 @@ class BeeCombConfig:
             "remap_class_name": self.dataset.remap_class_name,
             "remap_classes_set": sorted(self.dataset.remap_classes_set),
             "label_merge": dict(self.dataset.label_merge),
+            "shuffle_before_shard": self.dataset.shuffle_before_shard,
             "augmentation": self.training.augmentation,
             "epoch_early_stop": self.training.epoch_early_stop,
             "freeze_backbone": self.training.freeze_backbone,

@@ -1,6 +1,7 @@
 import logging
 import math
 import os
+import random
 import numpy as np
 import tensorflow as tf
 from pathlib import Path
@@ -41,7 +42,9 @@ class BeeCombDatasetProducer:
             f"clahe-{self.cfg.dataset.apply_clahe}",
             f"fixed-r{self.cfg.dataset.fixed_radius}" if self.cfg.dataset.fixed_radius > 0 else "fixed-rNone",
         ]
-        # label_merge is baked into the stored labels, so it must name its own cache (and leave the name of unmerged datasets unchanged).
+        # Both of these change the stored dataset, so each names its own cache (and leaves the default name unchanged).
+        if self.cfg.dataset.shuffle_before_shard:
+            name_parts.append("shuffled")
         if self.cfg.dataset.label_merge:
             name_parts.append("merge-" + "+".join(f"{src}-to-{dst}" for src, dst in sorted(self.cfg.dataset.label_merge.items())))
         return "_".join(name_parts).rstrip()
@@ -158,6 +161,16 @@ class BeeCombDatasetProducer:
         
         for sample in indexed_dataset:
             samples_by_class[sample[1]].append(sample)
+
+        if self.cfg.dataset.shuffle_before_shard:
+            # Shard order decides the split: BeeCombDataset.split takes the first 80% / next 10% / last 10% of each
+            # class stream, and its shuffle buffer (5000) is far smaller than a large class, so an unshuffled class is
+            # split by image order — the last images by file name become val/eval. Harmless for one homogeneous source,
+            # wrong when the dataset mixes sources (one source then lands entirely in val/eval). Seeded, so runs repeat.
+            rng = random.Random(self.cfg.dataset.seed)
+            for class_samples in samples_by_class.values():
+                rng.shuffle(class_samples)
+            logger.info("Shuffled each class before sharding (seed %d), so the train/val/eval split is random.", self.cfg.dataset.seed)
 
         for class_name in unique_labels:
             class_samples = samples_by_class[class_name]
