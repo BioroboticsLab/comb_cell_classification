@@ -11,6 +11,14 @@ A pipeline for classifying honeybee comb cells: train a classifier, run inferenc
 ./wandb_login.sh                # once per machine: log in to W&B with the key in .wandb_key
 ```
 
+`setup.sh` links `ccc`, `hbcsp` and the annotation tools into `~/.local/bin`, which must be on your `PATH`.
+
+What you get depends on the platform:
+
+- **macOS:** a ~1.3 GB venv with no TensorFlow, which is gated to Linux in `pyproject.toml`. The annotation tool works, but its **Classify sequence…** button is disabled. Training and `ccc classify` need Linux.
+- **Linux (x86_64):** a ~6.7 GB venv, because `tensorflow[and-cuda]` is a core dependency. This happens even if you only annotate. If `annotation-tool_v2` still reports `Could not load the Qt platform plugin "xcb"`, run it once with `QT_DEBUG_PLUGINS=1` to see which system library is missing. Then install it, e.g. on Ubuntu: `sudo apt install libxkbcommon-x11-0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-shape0 libxcb-xinerama0 libxcb-xfixes0 libxcb-xkb1`. The tool already works around the conflicting Qt plugins bundled with opencv-python (`_repair_qt_plugin_path` in `src/napari_tools/annotation_tool_v2/__main__.py`).
+- **Windows:** not supported.
+
 `./wandb_login.sh` reads `.wandb_key` (project root, gitignored — paste your W&B API key into it) and runs `wandb login`, which stores the key in `~/.netrc`. Every later online training run and every `wandb sync` picks it up from there. `ccc training --offline` needs no wandb key to run.
 
 ## Commands
