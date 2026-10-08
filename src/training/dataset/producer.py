@@ -128,7 +128,8 @@ class BeeCombDatasetProducer:
                 return f"{b / (1 << 30):.2f} GB"
             return f"{b / (1 << 20):.1f} MB"
         
-        save_path = self.cfg.paths.produced_dataset_save_path / self.readable_custom_name
+        # Resolved like the other paths: a config override arrives as a str, and str / str fails.
+        save_path = utils.resolve_to_root_path(self.cfg.paths.produced_dataset_save_path) / self.readable_custom_name
 
         # gets written as last step, so reliable for checking
         if skip_when_exists and (save_path / "properties.yaml").exists():
